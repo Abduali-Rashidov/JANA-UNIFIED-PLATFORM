@@ -1,5 +1,18 @@
--- Jana Unified Platform: initial shared data model
+-- Jana Unified Platform: shared prototype state + normalized future-ready schema
 create extension if not exists pgcrypto;
+
+create table if not exists public.prototype_state (
+  id text primary key check (id = 'main'),
+  tickets jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.prototype_state enable row level security;
+drop policy if exists "prototype public demo access" on public.prototype_state;
+create policy "prototype public demo access"
+  on public.prototype_state for all to anon, authenticated
+  using (true) with check (true);
+grant select, insert, update, delete on public.prototype_state to anon, authenticated;
 
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
@@ -21,7 +34,6 @@ create table if not exists public.tickets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create index if not exists tickets_client_jpid_idx on public.tickets(client_jpid);
 create index if not exists tickets_tracking_code_idx on public.tickets(tracking_code);
 create index if not exists tickets_status_idx on public.tickets(status);
@@ -36,7 +48,6 @@ create table if not exists public.messages (
   created_at timestamptz not null default now(),
   edited_at timestamptz
 );
-
 create index if not exists messages_ticket_created_idx on public.messages(ticket_id, created_at);
 
 create table if not exists public.ticket_events (
@@ -49,12 +60,23 @@ create table if not exists public.ticket_events (
   created_at timestamptz not null default now()
 );
 
--- Enable realtime publication for two-way chat and ticket updates.
-alter publication supabase_realtime add table public.tickets;
-alter publication supabase_realtime add table public.messages;
-alter publication supabase_realtime add table public.ticket_events;
+-- Realtime WebSocket subscriptions for the prototype state and normalized records.
+do $$ begin
+  alter publication supabase_realtime add table public.prototype_state;
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.tickets;
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.messages;
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.ticket_events;
+exception when duplicate_object then null;
+end $$;
 
--- IMPORTANT SECURITY NOTE:
--- JPID-only login is suitable only for a controlled prototype.
--- Before production, connect verified identity/authentication and enforce
--- row-level security policies. Do not expose service-role keys in the browser.
+-- DEMO ONLY: public JPID-only access is intentionally unauthenticated.
+-- Before production, remove the public demo policy and enforce verified auth + RLS.
