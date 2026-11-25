@@ -30,3 +30,19 @@ npm run dev
 Supabase жобасы қосылған кезде `supabase/schema.sql` бастапқы кестелерді құрады. Cloud режимін қосу үшін GitHub Actions secrets ішінде `VITE_SUPABASE_URL` және `VITE_SUPABASE_ANON_KEY` мәндерін орнату жеткіліксіз: клиент кодына нақты Auth, CRUD, Realtime және RLS интеграциясын қосу қажет. Қазіргі прототип бұл интеграцияны әлі орындамайды.
 
 **Қауіпсіздік:** JPID-тің өзін ғана парольсіз енгізу — тек демонстрациялық кіру. Өндірістік жүйеде расталған аутентификация, рөлдік рұқсаттар және дерекқор деңгейіндегі RLS міндетті.
+
+
+## Екі портал және ортақ real-time сервер
+
+- Клиент порталы: GitHub Pages сайтының негізгі мекенжайы.
+- Оператор порталы: сол домендегі `/operator.html` (SWAT демо режимі).
+- Екі портал `src/lib/supabase.js` арқылы бір Supabase жобасына қосылады.
+- `supabase/schema.sql` ішіндегі `prototype_state` кестесі демо тикеттерді ортақ сақтайды.
+- Supabase Realtime WebSocket өзгерістерді екі порталға таратады; Supabase бапталмаса, localStorage режимі сақталады.
+
+### Cloud режимін қосу
+1. Supabase жобасында SQL Editor арқылы `supabase/schema.sql` файлын орындаңыз.
+2. GitHub репозиторийінің Settings → Secrets and variables → Actions ішіне `VITE_SUPABASE_URL` және `VITE_SUPABASE_ANON_KEY` қосыңыз.
+3. `main` тармағына commit жасалғанда GitHub Actions сайтты қайта жинап жариялайды.
+
+**Маңызды:** ашық RLS саясаты тек демонстрациялық прототипке арналған. Нақты клиент деректерімен өндірісте қолдануға болмайды.
