@@ -27,6 +27,7 @@ export default function App(){
  const [user,setUser]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(USER))||null}catch{return null}});
  const [loginId,setLoginId]=useState('');
  const [section,setSection]=useState('client');
+ const [sidebar,setSidebar]=useState(true);
  const [activeId,setActiveId]=useState(null);
  const [view,setView]=useState('open');
  const [clientTab,setClientTab]=useState('open');
@@ -48,9 +49,9 @@ export default function App(){
  const fileRef=useRef(null);
  const chatRef=useRef(null);
  const active=tickets.find(t=>t.id===activeId)||null;
- const role=user?.role||'client';
- const currentJpid=user?.jpid||'';
- const isOperator=role!=='client';
+ const isOperator=section==='operator';
+ const role=isOperator?'operator':'client';
+ const currentJpid=isOperator?'SWAT':(user?.jpid||'');
 
  useEffect(()=>{localStorage.setItem(STORE,JSON.stringify(tickets));},[tickets]);
  useEffect(()=>{const sync=e=>{if(e.key===STORE&&e.newValue){try{setTickets(JSON.parse(e.newValue))}catch{}}};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync)},[]);
