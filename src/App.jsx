@@ -5,7 +5,7 @@ import {
   MessageCircle, Paperclip, Plus, Search, Send, Settings, ShieldCheck,
   Smile, UserRound, X, Pencil, Clock, Image as ImageIcon, FileText, MoreHorizontal
 } from 'lucide-react';
-import { isCloudConfigured } from './lib/supabase';
+import { isCloudConfigured, supabase } from './lib/supabase';
 
 const STORE = 'jana-unified-prototype-v2';
 const USER = 'jana-user';
@@ -24,9 +24,9 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 export default function App(){
  const [tickets,setTickets]=useState(readTickets);
- const [user,setUser]=useState(()=>{try{return JSON.parse(sessionStorage.getItem(USER))||null}catch{return null}});
+ const [user,setUser]=useState(()=>{if(new URLSearchParams(window.location.search).get('portal')==='operator')return {jpid:'SWAT',role:'operator'};try{return JSON.parse(sessionStorage.getItem(USER))||null}catch{return null}});
  const [loginId,setLoginId]=useState('');
- const [section,setSection]=useState('client');
+ const [section,setSection]=useState(()=>new URLSearchParams(window.location.search).get('portal')==='operator'?'operator':'client');
  const [sidebar,setSidebar]=useState(true);
  const [activeId,setActiveId]=useState(null);
  const [view,setView]=useState('open');
@@ -53,7 +53,32 @@ export default function App(){
  const role=isOperator?'operator':'client';
  const currentJpid=isOperator?'SWAT':(user?.jpid||'');
 
- useEffect(()=>{localStorage.setItem(STORE,JSON.stringify(tickets));},[tickets]);
+ const cloudReady=useRef(false);
+ const ticketsRef=useRef(tickets);
+ useEffect(()=>{ticketsRef.current=tickets},[tickets]);
+ useEffect(()=>{
+   if(!isCloudConfigured||!supabase){localStorage.setItem(STORE,JSON.stringify(ticketsRef.current));return}
+   let alive=true;
+   const load=async()=>{
+     const {data,error}=await supabase.from('prototype_state').select('tickets').eq('id','main').maybeSingle();
+     if(!alive)return;
+     if(data?.tickets){ticketsRef.current=data.tickets;setTickets(data.tickets)}
+     else if(!error){await supabase.from('prototype_state').upsert({id:'main',tickets:ticketsRef.current,updated_at:new Date().toISOString()})}
+     cloudReady.current=true;
+   };
+   load();
+   const channel=supabase.channel('jana-prototype-realtime').on('postgres_changes',{event:'UPDATE',schema:'public',table:'prototype_state',filter:'id=eq.main'},payload=>{
+     const incoming=payload.new?.tickets;
+     if(Array.isArray(incoming)&&JSON.stringify(incoming)!==JSON.stringify(ticketsRef.current)){ticketsRef.current=incoming;setTickets(incoming)}
+   }).subscribe();
+   return()=>{alive=false;supabase.removeChannel(channel)};
+ },[]);
+ useEffect(()=>{
+   const snapshot=JSON.stringify(tickets);
+   if(!isCloudConfigured||!supabase){localStorage.setItem(STORE,snapshot);return}
+   if(!cloudReady.current)return;
+   supabase.from('prototype_state').upsert({id:'main',tickets,updated_at:new Date().toISOString()}).then(({error})=>{if(error)console.error('Cloud sync error:',error.message)});
+ },[tickets]);
  useEffect(()=>{const sync=e=>{if(e.key===STORE&&e.newValue){try{setTickets(JSON.parse(e.newValue))}catch{}}};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync)},[]);
  useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight},[activeId,active?.messages?.length,drawerTab]);
  const flash=t=>{setNotice(t);window.clearTimeout(flash.timer);flash.timer=window.setTimeout(()=>setNotice(''),2600)};
