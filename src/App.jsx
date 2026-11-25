@@ -5,7 +5,7 @@ import {
   MessageCircle, Paperclip, Plus, Search, Send, Settings, ShieldCheck,
   Smile, UserRound, X, Pencil, Clock, Image as ImageIcon, FileText, MoreHorizontal
 } from 'lucide-react';
-import { isCloudConfigured, supabase } from './lib/supabase';
+import { fetchSharedTickets, saveSharedTickets, subscribeSharedTickets } from './lib/bridge';
 
 const STORE = 'jana-unified-prototype-v2';
 const USER = 'jana-user';
@@ -53,32 +53,28 @@ export default function App(){
  const role=isOperator?'operator':'client';
  const currentJpid=isOperator?'SWAT':(user?.jpid||'');
 
- const cloudReady=useRef(false);
+ const [sharedReady,setSharedReady]=useState(false);
  const ticketsRef=useRef(tickets);
  useEffect(()=>{ticketsRef.current=tickets},[tickets]);
  useEffect(()=>{
-   if(!isCloudConfigured||!supabase){localStorage.setItem(STORE,JSON.stringify(ticketsRef.current));return}
    let alive=true;
-   const load=async()=>{
-     const {data,error}=await supabase.from('prototype_state').select('tickets').eq('id','main').maybeSingle();
-     if(!alive)return;
-     if(data?.tickets){ticketsRef.current=data.tickets;setTickets(data.tickets)}
-     else if(!error){await supabase.from('prototype_state').upsert({id:'main',tickets:ticketsRef.current,updated_at:new Date().toISOString()})}
-     cloudReady.current=true;
+   const reload=async()=>{
+     try{
+       const incoming=await fetchSharedTickets();
+       if(alive&&Array.isArray(incoming)&&JSON.stringify(incoming)!==JSON.stringify(ticketsRef.current)){
+         ticketsRef.current=incoming;
+         setTickets(incoming);
+       }
+     }catch(error){console.error('Shared server read error:',error)}
    };
-   load();
-   const channel=supabase.channel('jana-prototype-realtime').on('postgres_changes',{event:'UPDATE',schema:'public',table:'prototype_state',filter:'id=eq.main'},payload=>{
-     const incoming=payload.new?.tickets;
-     if(Array.isArray(incoming)&&JSON.stringify(incoming)!==JSON.stringify(ticketsRef.current)){ticketsRef.current=incoming;setTickets(incoming)}
-   }).subscribe();
-   return()=>{alive=false;supabase.removeChannel(channel)};
+   reload().finally(()=>{if(alive)setSharedReady(true)});
+   const stop=subscribeSharedTickets(reload);
+   return()=>{alive=false;if(stop)stop()};
  },[]);
  useEffect(()=>{
-   const snapshot=JSON.stringify(tickets);
-   if(!isCloudConfigured||!supabase){localStorage.setItem(STORE,snapshot);return}
-   if(!cloudReady.current)return;
-   supabase.from('prototype_state').upsert({id:'main',tickets,updated_at:new Date().toISOString()}).then(({error})=>{if(error)console.error('Cloud sync error:',error.message)});
- },[tickets]);
+   if(!sharedReady)return;
+   saveSharedTickets(tickets).catch(error=>console.error('Shared server write error:',error));
+ },[tickets,sharedReady]);
  useEffect(()=>{const sync=e=>{if(e.key===STORE&&e.newValue){try{setTickets(JSON.parse(e.newValue))}catch{}}};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync)},[]);
  useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight},[activeId,active?.messages?.length,drawerTab]);
  const flash=t=>{setNotice(t);window.clearTimeout(flash.timer);flash.timer=window.setTimeout(()=>setNotice(''),2600)};
@@ -113,7 +109,7 @@ export default function App(){
  if(!user)return <div className="login-screen"><div className="login-card"><div className="brand-mark">J</div><div className="eyebrow">JANA POST · UNIFIED PLATFORM</div><h1>Бірыңғай жұмыс кеңістігі</h1><p>Клиенттік қолдау және SWAT операторлық жүйесі</p><form onSubmit={login}><label>JPID</label><input autoFocus value={loginId} onChange={e=>setLoginId(e.target.value)} placeholder="JPID енгізіңіз"/><button className="primary full">Жүйеге кіру <ArrowLeft size={17}/></button></form><div className="login-hint"><ShieldCheck size={15}/> Демо кіру: клиент — кез келген JPID; оператор — SWAT</div><div className="login-foot">Jana Post · Prototype</div></div></div>;
 
  return <div className="app-shell">
-  <header className="topbar"><button className="icon-btn" onClick={()=>setSidebar(v=>!v)}><Menu/></button><div className="brand"><span className="brand-mark small">J</span><b>Jana Post</b><span className="divider-v"/><span className="muted">Unified Platform</span></div><div className="top-actions"><span className={isCloudConfigured?'cloud online':'cloud'}><i/>{isCloudConfigured?'Cloud connected':'Prototype · Local data'}</span><button className="icon-btn" onClick={()=>flash('Жаңа хабарламалар осы тикеттерде белгіленеді')}><Bell/></button><div className="user-chip"><span className="avatar">{currentJpid.slice(0,1)}</span><span>{currentJpid}</span><ChevronDown size={14}/></div><button className="icon-btn" title="Шығу" onClick={logout}><LogOut/></button></div></header>
+  <header className="topbar"><button className="icon-btn" onClick={()=>setSidebar(v=>!v)}><Menu/></button><div className="brand"><span className="brand-mark small">J</span><b>Jana Post</b><span className="divider-v"/><span className="muted">Unified Platform</span></div><div className="top-actions"><span className={isCloudConfigured?'cloud online':'cloud'}><i/>Shared server · Real-time</span><button className="icon-btn" onClick={()=>flash('Жаңа хабарламалар осы тикеттерде белгіленеді')}><Bell/></button><div className="user-chip"><span className="avatar">{currentJpid.slice(0,1)}</span><span>{currentJpid}</span><ChevronDown size={14}/></div><button className="icon-btn" title="Шығу" onClick={logout}><LogOut/></button></div></header>
   <div className="workspace">
    {sidebar&&<aside className="sidebar"><div className="side-caption">ЖҰМЫС КЕҢІСТІГІ</div><button className={section==='operator'?'side-link selected':'side-link'} onClick={()=>{setSection('operator');setActiveId(null)}}><LayoutDashboard/> SWAT · Оператор</button><button className={section==='client'?'side-link selected':'side-link'} onClick={()=>{setSection('client');setActiveId(null)}}><MessageCircle/> Jana AI Chat</button><div className="side-caption space">ЖАЛПЫ</div><button className="side-link" onClick={()=>flash('Аналитика келесі модульде қосылады')}><Activity/> Аналитика</button><button className="side-link" onClick={()=>flash('Баптаулар келесі модульде қосылады')}><Settings/> Баптаулар</button><div className="sidebar-bottom"><div className="help-box"><CircleHelp/><b>Көмек керек пе?</b><span>Жүйе бойынша нұсқаулық</span></div><small>Jana Post © 2026</small></div></aside>}
    <main className="main-area">
