@@ -1,20 +1,41 @@
 const API_BASE = 'https://jana-post-realtime.hatchable.site/api';
+const LOCAL_KEY = 'jana-unified-prototype-v2';
+
+function readLocal() {
+  try {
+    const value = JSON.parse(localStorage.getItem(LOCAL_KEY));
+    return Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function fetchSharedTickets() {
-  const response = await fetch(`${API_BASE}/state`, { method: 'GET', cache: 'no-store' });
-  if (!response.ok) throw new Error(`State API returned ${response.status}`);
-  const data = await response.json();
-  return Array.isArray(data.tickets) ? data.tickets : null;
+  try {
+    const response = await fetch(`${API_BASE}/state`, { method: 'GET', cache: 'no-store' });
+    if (!response.ok) throw new Error(`State API returned ${response.status}`);
+    const data = await response.json();
+    return Array.isArray(data.tickets) ? data.tickets : null;
+  } catch (error) {
+    console.warn('Shared API unavailable; using this browser local data.', error);
+    return readLocal();
+  }
 }
 
 export async function saveSharedTickets(tickets) {
-  const response = await fetch(`${API_BASE}/state`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tickets })
-  });
-  if (!response.ok) throw new Error(`State API returned ${response.status}`);
-  return response.json();
+  try {
+    const response = await fetch(`${API_BASE}/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickets })
+    });
+    if (!response.ok) throw new Error(`State API returned ${response.status}`);
+    return response.json();
+  } catch (error) {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(tickets));
+    console.warn('Shared API unavailable; saved locally in this browser.', error);
+    return { ok: true, mode: 'local' };
+  }
 }
 
 export function subscribeSharedTickets(onUpdate) {
@@ -22,7 +43,7 @@ export function subscribeSharedTickets(onUpdate) {
     authUrl: `${API_BASE}/events-token`
   });
   if (!realtime) {
-    console.warn('Realtime client library is not available; refresh the page to load shared updates.');
+    console.warn('Realtime client is not available. Local demo mode remains active.');
     return () => {};
   }
   const channel = realtime.channel('jana-post');
