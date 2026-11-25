@@ -36,13 +36,8 @@ Supabase жобасы қосылған кезде `supabase/schema.sql` баст
 
 - Клиент порталы: GitHub Pages сайтының негізгі мекенжайы.
 - Оператор порталы: сол домендегі `/operator.html` (SWAT демо режимі).
-- Екі портал `src/lib/supabase.js` арқылы бір Supabase жобасына қосылады.
-- `supabase/schema.sql` ішіндегі `prototype_state` кестесі демо тикеттерді ортақ сақтайды.
-- Supabase Realtime WebSocket өзгерістерді екі порталға таратады; Supabase бапталмаса, localStorage режимі сақталады.
+- Екі портал бір Hatchable API серверіне және PostgreSQL дерекқорына қосылады.
+- Әр өзгерістен кейін сервер `jana-post` арнасына оқиға жариялайды; браузерлер Hatchable Realtime арқылы өзгерісті бірден алып, ортақ күйді қайта жүктейді. Өз қолымызбен polling циклін қолданбаймыз.
+- Сервер API: `https://jana-post-realtime.hatchable.site/api/state`; оқиға токені: `/api/events-token`.
 
-### Cloud режимін қосу
-1. Supabase жобасында SQL Editor арқылы `supabase/schema.sql` файлын орындаңыз.
-2. GitHub репозиторийінің Settings → Secrets and variables → Actions ішіне `VITE_SUPABASE_URL` және `VITE_SUPABASE_ANON_KEY` қосыңыз.
-3. `main` тармағына commit жасалғанда GitHub Actions сайтты қайта жинап жариялайды.
-
-**Маңызды:** ашық RLS саясаты тек демонстрациялық прототипке арналған. Нақты клиент деректерімен өндірісте қолдануға болмайды.
+**Демо режим:** JPID-only кіру. Бұл нұсқа тек прототипке арналған; ашық API және рөлдерді тексермеу өндірістік қауіпсіздікке жарамайды.
