@@ -5,7 +5,7 @@ import {
   MessageCircle, Paperclip, Plus, Search, Send, Settings, ShieldCheck,
   Smile, UserRound, X, Pencil, Clock, Image as ImageIcon, FileText, MoreHorizontal
 } from 'lucide-react';
-import { fetchSharedTickets, saveSharedTickets, subscribeSharedTickets } from './lib/bridge';
+import { fetchSharedTickets, saveSharedTickets, subscribeSharedTickets } from './lib/api-bridge';
 
 const STORE = 'jana-unified-prototype-v2';
 const USER = 'jana-user';
