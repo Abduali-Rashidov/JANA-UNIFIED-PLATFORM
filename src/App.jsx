@@ -54,6 +54,7 @@ export default function App(){
  const currentJpid=isOperator?'SWAT':(user?.jpid||'');
 
  const [sharedReady,setSharedReady]=useState(false);
+ const isCloudConfigured=sharedReady;
  const ticketsRef=useRef(tickets);
  useEffect(()=>{ticketsRef.current=tickets},[tickets]);
  useEffect(()=>{
